@@ -1,0 +1,219 @@
+---
+title: "R Notebook"
+output:
+  word_document: default
+  html_notebook: default
+  pdf_document: default
+---
+Final Project
+```{r}
+library(carData)
+library(car)
+library(ggplot2)
+library(hrbrthemes)
+library(GGally)
+getwd()
+
+day <- read.csv2("Bike-Sharing-Dataset/day.csv",header=TRUE,sep=",")
+
+month <- factor(day$mnth)
+day$temp = as.numeric(day$temp)
+day$hum = as.numeric(day$hum)
+day$registered = as.numeric(day$registered)
+day$casual = as.numeric(day$casual)
+day$windspeed = as.numeric(day$windspeed)
+day$atemp = as.numeric(day$atemp)
+
+
+training <- day[(day$dteday <= "2011-12-31"),]
+validation <- day[(day$dteday > "2011-12-31"),]
+
+```
+```{r}
+lm(casual~windspeed+hum+atemp+temp+weathersit+workingday+weekday+holiday+mnth+season, training)
+
+step(lm(casual~windspeed+hum+atemp+temp+weathersit+workingday+weekday+holiday+mnth+season, training),direction="both",k=log(365))
+
+# final model: casual ~ windspeed + temp + weathersit + workingday with bic
+
+step(lm(casual~windspeed+hum+atemp+temp+weathersit+workingday+weekday+holiday+mnth+season, training),direction="both",k=2)
+
+# final model:  casual ~ windspeed + temp + weathersit + workingday + mnth + season with aic
+
+
+step(lm(registered~windspeed+hum+atemp+temp+weathersit+workingday+weekday+holiday+mnth+season, training),direction="both",k=log(365))
+
+# final model: registered ~ windspeed + temp + weathersit + workingday + season with bic
+
+step(lm(registered~windspeed+hum+atemp+temp+weathersit+workingday+weekday+holiday+mnth+season, training),direction="both",k=2)
+
+# registered ~ windspeed + temp + weathersit + workingday + weekday + season with aic
+
+# 
+```
+
+```{r}
+library(glmnet)
+library(ggfortify)
+par(mfrow=c(1,1))
+x <- model.matrix(casual~windspeed+hum+atemp+temp+weathersit+workingday+weekday+holiday+mnth+season, training)
+y <- training$casual
+fit1 <- glmnet::glmnet(x, y, alpha = 1)
+pallete = c('black', 'red', 'blue', 'green', 'orange','pink','magenta','cyan','yellow','blueviolet','brown','darkolivegreen')
+autoplot(fit1) + scale_colour_manual(values=pallete)
+```
+
+```{r}
+library(glmnet)
+library(ggfortify)
+par(mfrow=c(1,1))
+x <- model.matrix(registered~windspeed+hum+atemp+temp+weathersit+workingday+weekday+holiday+mnth+season, training)
+y <- training$registered
+fit2 <- glmnet::glmnet(x, y, alpha = 1)
+pallete = c('black', 'red', 'blue', 'green', 'orange','pink','magenta','cyan','yellow','blueviolet','brown','darkolivegreen')
+autoplot(fit2) + scale_colour_manual(values=pallete)
+```
+
+```{r}
+lmp.casual <- function(linearmodel){
+  plot(linearmodel)
+  plot(fitted(linearmodel),rstandard(linearmodel))
+  plot(training$casual,rstandard(linearmodel))
+  hist(rstandard(linearmodel))
+  
+}  
+
+lmp.registered <- function(linearmodel){
+  plot(linearmodel)
+  plot(fitted(linearmodel),rstandard(linearmodel))
+  plot(training$registered,rstandard(linearmodel))
+  hist(rstandard(linearmodel))
+}  
+```
+
+
+```{r}
+lm1 <- lm(casual ~ windspeed + temp + weathersit + workingday,training)
+lm2 <- lm(casual ~ windspeed + temp + weathersit + workingday + mnth + season,training)
+{plot(fitted(lm1),training$casual)
+abline(0,1)}
+lmp.casual(lm1)
+lmp.casual(lm2)
+
+lm3 <- lm(registered ~ windspeed + temp + weathersit + workingday + season,training)
+lm4 <- lm(registered ~ windspeed + temp + weathersit + workingday + weekday + season,training)
+lmp.registered(lm3)
+lmp.registered(lm4)
+
+```
+
+```{r}
+lm5 <- lm(casual ~ temp + workingday + atemp + weathersit, training)
+lm55 <- lm(casual ~ temp + workingday + atemp, training)
+lmp.casual(lm5)
+lmp.casual(lm55)
+
+lm6 <- lm(registered ~ season + workingday + atemp + weathersit, training)
+lm7 <- lm(registered ~ atemp, training)
+lmp.registered(lm6)
+lmp.registered(lm7)
+```
+```{r}
+# model 1 summary 
+summary(lm1)
+```
+```{r}
+# model 2 summary 
+summary(lm2)
+```
+
+```{r}
+# model 3 summary 
+summary(lm3)
+```
+
+```{r}
+# model 4 summary 
+summary(lm4)
+```
+
+```{r}
+# model 5 summary 
+summary(lm5)
+```
+
+```{r}
+# model 55 summary 
+summary(lm55)
+```
+
+```{r}
+# model 6 summary 
+summary(lm6)
+```
+
+```{r}
+# model 7 summary 
+summary(lm7)
+```
+
+
+```{r}
+rmse.casual <- function(linearmodel){
+  ResValidation <- validation$casual - predict(linearmodel, newdata = validation)
+  mean((resid(linearmodel))^2)
+  mean((ResValidation)^2)
+  rmse <- mean((resid(linearmodel))^2)/mean((ResValidation)^2)
+  return(rmse)
+}
+
+rmse.reg <- function(linearmodel){
+  ResValidation <- validation$registered - predict(linearmodel, newdata = validation)
+  mean((resid(linearmodel))^2)
+  mean((ResValidation)^2)
+  rmse <- mean((resid(linearmodel))^2)/mean((ResValidation)^2)
+  return(rmse)
+}
+
+rmse.casual(lm1)
+rmse.casual(lm2)
+rmse.casual(lm5)
+rmse.casual(lm55)
+
+rmse.reg(lm3)
+rmse.reg(lm4)
+rmse.reg(lm6)
+rmse.reg(lm7)
+
+```
+
+```{r}
+# PI1 <- predict(wlm10, newdata = validation,interval = "predict")
+
+ggplot(data = validation, aes(x = dteday)) +
+  geom_line(aes(y = casual, color = "casual"),group = 1) +
+  geom_line(aes(y = predict(lm1, newdata = validation), color="predict(lm1)"), linetype="twodash",group = 1) +
+  scale_color_manual(name = element_blank(), labels = c("casual","predict(lm1)","conf","conf"),
+    values = c("darkred", "steelblue","green","green")) + labs(y = "") +
+  ggtitle("Validation")
+
+
+
+ggplot(data = validation, aes(x = dteday)) +
+  geom_line(aes(y = registered, color = "registered"),group = 1) +
+  geom_line(aes(y = predict(lm4, newdata = validation), color="predict(lm4)"), linetype="twodash",group = 1) +
+  scale_color_manual(name = element_blank(), labels = c("registered","lm4"),
+    values = c("darkred", "steelblue")) + labs(y = "") +
+  ggtitle("Validation")
+
+
+ttlcnt <- predict(lm4, newdata = validation) + predict(lm1, newdata = validation)
+
+ggplot(data = validation, aes(x = dteday)) +
+  geom_line(aes(y = cnt, color = "cnt"),group = 1) +
+  geom_line(aes(y = ttlcnt, color="ttlcnt"),linetype="twodash",group = 1) +
+  scale_color_manual(name = element_blank(), labels = c("cnt","ttlcnt"),
+    values = c("darkred", "steelblue")) + labs(y = "") +
+  ggtitle("Validation")
+```
+
